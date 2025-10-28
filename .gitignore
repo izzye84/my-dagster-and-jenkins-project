@@ -26,3 +26,4 @@ wheels/
 *.egg
 
 .venv/
+.DS_Store
