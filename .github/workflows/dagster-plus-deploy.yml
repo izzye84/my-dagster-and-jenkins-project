@@ -90,9 +90,9 @@ jobs:
       - name: Update PR comment for branch deployments
         id: ci-notify
         if: steps.prerun.outputs.result != 'skip'
-        uses: dagster-io/dagster-cloud-action/actions/utils/dg-cli@v1.11.13
+        uses: dagster-io/dagster-cloud-action/actions/utils/dagster-cloud-cli@v1.11.13
         with:
-          command: "ci notify --project-dir=${{ env.DAGSTER_PROJECT_DIR }}"
+          command: "plus deploy notify --project-dir=${{ env.DAGSTER_PROJECT_DIR }}"
 
       # Generate a summary that shows up on the Workflow Summary page
       - name: Generate a summary
@@ -100,4 +100,4 @@ jobs:
         if: steps.prerun.outputs.result != 'skip'
         uses: dagster-io/dagster-cloud-action/actions/utils/dg-cli@v1.11.13
         with:
-          command: "ci status --output-format=markdown >> $GITHUB_STEP_SUMMARY"
+          command: "plus deploy status --output-format=markdown >> $GITHUB_STEP_SUMMARY"
