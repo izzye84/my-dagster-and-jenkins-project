@@ -78,15 +78,18 @@ pipeline {
                 script {
                     // Parse dagster_cloud.yaml and initialize build session
                     def deploymentName = env.IS_MAIN_BRANCH == 'true' ? 'prod' : env.BRANCH_NAME
+
+                    // Get git metadata for Dagster+ UI
                     def gitUrl = scm.userRemoteConfigs[0].url
-                    def commitHash = env.GIT_COMMIT
+                    def commitHash = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
 
                     sh """
                         cd ${DAGSTER_PROJECT_DIR}
                         python${PYTHON_VERSION} -m uv run dg plus deploy start \
                             --deployment ${deploymentName} \
                             --git-url ${gitUrl} \
-                            --commit-hash ${commitHash}
+                            --commit-hash ${commitHash} \
+                            --yes
                     """
                 }
             }
