@@ -81,7 +81,7 @@ pipeline {
 
                     sh """
                         cd ${DAGSTER_PROJECT_DIR}
-                        python${PYTHON_VERSION} -m uv run dg plus deploy init --deployment ${deploymentName}
+                        python${PYTHON_VERSION} -m uv run dg plus deploy start --deployment ${deploymentName}
                     """
                 }
             }
