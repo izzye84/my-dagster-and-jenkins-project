@@ -81,7 +81,10 @@ pipeline {
 
                     sh """
                         cd ${DAGSTER_PROJECT_DIR}
-                        python${PYTHON_VERSION} -m uv run dg plus deploy start --deployment ${deploymentName}
+                        python${PYTHON_VERSION} -m uv run dg plus deploy start \
+                            --deployment ${deploymentName} \
+                            --git-url ${GIT_URL} \
+                            --commit-hash ${GIT_COMMIT}
                     """
                 }
             }
