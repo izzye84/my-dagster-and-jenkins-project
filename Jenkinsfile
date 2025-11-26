@@ -10,10 +10,9 @@ pipeline {
         DAGSTER_CLOUD_API_TOKEN = credentials('DAGSTER_CLOUD_API_TOKEN')
         ENABLE_FAST_DEPLOYS = 'true'
         PYTHON_VERSION = '3.10'
-        DAGSTER_CLOUD_YAML_PATH = '.'
         DAGSTER_CLOUD_FILE = 'dagster_cloud.yaml'
         DAGSTER_CLOUD_ORGANIZATION = 'izzy-serverless-test'
-        DAGSTER_CLOUD_URL = 'https://izzy-serverless-test.dagster.cloud'
+        DAGSTER_PROJECT_DIR = '.'
     }
 
     options {
@@ -52,24 +51,20 @@ pipeline {
             }
         }
 
-        stage('Validate Configuration') {
+        stage('Setup CLI') {
             when {
                 not { environment name: 'DEPLOYMENT_STRATEGY', value: 'skip' }
             }
             steps {
                 script {
-                    // Install Dagster Cloud CLI if not already available
+                    // Install Dagster Cloud CLI and uv if not already available
                     sh '''
                         if ! command -v dagster-cloud &> /dev/null; then
                             pip install dagster-cloud
                         fi
-                    '''
 
-                    // Validate dagster_cloud.yaml and connection
-                    sh '''
-                        dagster-cloud ci check \
-                            --project-dir ${DAGSTER_CLOUD_YAML_PATH} \
-                            --dagster-cloud-yaml-path ${DAGSTER_CLOUD_FILE}
+                        # Install uv for faster dependency management
+                        pip install uv
                     '''
                 }
             }
@@ -84,12 +79,32 @@ pipeline {
                     // Parse dagster_cloud.yaml and initialize build session
                     def deploymentName = env.IS_MAIN_BRANCH == 'true' ? 'prod' : env.BRANCH_NAME
 
+                    // Get git metadata for Dagster+ UI
+                    def gitUrl = scm.userRemoteConfigs[0].url
+                    def commitHash = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+
                     sh """
-                        dagster-cloud ci init \
-                            --project-dir ${DAGSTER_CLOUD_YAML_PATH} \
-                            --dagster-cloud-yaml-path ${DAGSTER_CLOUD_FILE} \
+                        cd ${DAGSTER_PROJECT_DIR}
+                        python${PYTHON_VERSION} -m uv run dg plus deploy start \
                             --deployment ${deploymentName} \
-                            --statedir /tmp/dagster-cloud-ci
+                            --git-url ${gitUrl} \
+                            --commit-hash ${commitHash} \
+                            --yes
+                    """
+                }
+            }
+        }
+
+        stage('Refresh Defs State') {
+            when {
+                not { environment name: 'DEPLOYMENT_STRATEGY', value: 'skip' }
+            }
+            steps {
+                script {
+                    // Refresh state for any StateBackedComponents in the project
+                    sh """
+                        cd ${DAGSTER_PROJECT_DIR}
+                        python${PYTHON_VERSION} -m uv run dg plus deploy refresh-defs-state
                     """
                 }
             }
@@ -116,34 +131,17 @@ pipeline {
             }
         }
 
-        stage('Build PEX') {
+        stage('Build and Push') {
             when {
-                environment name: 'DEPLOYMENT_STRATEGY', value: 'pex-deploy'
+                not { environment name: 'DEPLOYMENT_STRATEGY', value: 'skip' }
             }
             steps {
                 script {
-                    sh '''
-                        dagster-cloud ci build \
-                            --build-strategy=python-executable \
-                            --python-version ${PYTHON_VERSION} \
-                            --statedir /tmp/dagster-cloud-ci
-                    '''
-                }
-            }
-        }
-
-        stage('Build Docker') {
-            when {
-                environment name: 'DEPLOYMENT_STRATEGY', value: 'docker-deploy'
-            }
-            steps {
-                script {
-                    sh '''
-                        dagster-cloud ci build \
-                            --build-strategy=docker \
-                            --python-version ${PYTHON_VERSION} \
-                            --statedir /tmp/dagster-cloud-ci
-                    '''
+                    // Build and push code locations to Dagster Cloud
+                    sh """
+                        cd ${DAGSTER_PROJECT_DIR}
+                        python${PYTHON_VERSION} -m uv run dg plus deploy build-and-push --agent-type=serverless --python-version ${PYTHON_VERSION}
+                    """
                 }
             }
         }
@@ -154,7 +152,10 @@ pipeline {
             }
             steps {
                 script {
-                    sh 'dagster-cloud ci deploy --statedir /tmp/dagster-cloud-ci'
+                    sh """
+                        cd ${DAGSTER_PROJECT_DIR}
+                        python${PYTHON_VERSION} -m uv run dg plus deploy finish
+                    """
                 }
             }
         }
@@ -168,10 +169,10 @@ pipeline {
             }
             steps {
                 script {
-                    sh '''
-                        dagster-cloud ci notify \
-                            --project-dir=${DAGSTER_CLOUD_YAML_PATH}
-                    '''
+                    sh """
+                        cd ${DAGSTER_PROJECT_DIR}
+                        dagster-cloud ci notify --project-dir=${DAGSTER_PROJECT_DIR}
+                    """
                 }
             }
         }
@@ -182,10 +183,11 @@ pipeline {
             }
             steps {
                 script {
-                    sh '''
+                    sh """
+                        cd ${DAGSTER_PROJECT_DIR}
                         echo "## Dagster Cloud Deployment Summary" > deployment_summary.md
-                        dagster-cloud ci status --output-format=markdown --statedir /tmp/dagster-cloud-ci >> deployment_summary.md
-                    '''
+                        dagster-cloud ci status --output-format=markdown >> deployment_summary.md
+                    """
 
                     // Archive the summary for Jenkins UI
                     archiveArtifacts artifacts: 'deployment_summary.md', allowEmptyArchive: true
