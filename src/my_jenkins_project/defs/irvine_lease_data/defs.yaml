@@ -1,0 +1,23 @@
+type: my_jenkins_project.components.ssis_package.SsisPackage
+
+requirements:
+  env:
+    - AZURE_SQL_USERNAME
+    - AZURE_SQL_PASSWORD
+
+attributes:
+  # SQL Server Configuration for SSISDB
+  sql_server: "izzy-ssis-test.database.windows.net"
+  sql_database: "SSISDB"
+  sql_username: "{{ env.AZURE_SQL_USERNAME }}"
+  sql_password: "{{ env.AZURE_SQL_PASSWORD }}"
+
+  # SSIS Package Location
+  folder_name: "IrvineDemo"
+  project_name: "dagster-ssis-demo"
+  package_name: "LoadLeaseData.dtsx"
+
+  # Dagster Asset Configuration
+  asset_key: "load_lease_data"
+  description: "Loads Irvine Company lease data from CSV to Azure SQL Database"
+  group_name: "irvine_ingestion"

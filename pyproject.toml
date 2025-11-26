@@ -6,6 +6,9 @@ dependencies = [
     "dagster",
     "dagster-cloud",
     "pandas",
+    "azure-mgmt-datafactory",
+    "azure-identity",
+    "pyodbc",
 ]
 
 [dependency-groups]
